@@ -8,13 +8,11 @@ VirPLM is a two-stage framework that leverages the fine-tuned ESM-2 protein lang
 - Torch 1.11.0
 - Transformers 4.47.1
 - Tokenizers 0.21.0
-- Safetensors 0.5.0
 - Huggingface Hub
 - Numpy 1.26.4
 - Pandas 2.2.3
 - Scipy 1.14.1
 - Matplotlib 3.10.0
-
 
 ### How to run
 If you want to manually setup VirPLM, we recommend you to use Anaconda to build the runtime environment. The ESM-2 setup is based on the [official ESM repository](https://github.com/facebookresearch/esm).
