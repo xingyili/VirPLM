@@ -15,6 +15,7 @@ VirPLM is a two-stage framework that leverages the fine-tuned ESM-2 protein lang
 - Scipy 1.14.1
 - Matplotlib 3.10.0
 
+
 ### How to run
 If you want to manually setup VirPLM, we recommend you to use Anaconda to build the runtime environment. The ESM-2 setup is based on the [official ESM repository](https://github.com/facebookresearch/esm).
 
