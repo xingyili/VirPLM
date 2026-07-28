@@ -73,11 +73,12 @@ class H3N2DataProcessor:
         self.bin_threshold = float(bin_threshold)
         self.deduplicate = deduplicate
 
-        if metadata_path is None:
-            raise ValueError(
-                "metadata_path is required for retrospective time-split evaluation."
-            )
-        self.metadata_dates = load_metadata_dates(metadata_path)
+        self.require_collection_dates = metadata_path is not None
+        self.metadata_dates = (
+            load_metadata_dates(metadata_path)
+            if self.require_collection_dates
+            else {}
+        )
         self._preprocess()
 
     @staticmethod
@@ -91,6 +92,9 @@ class H3N2DataProcessor:
         return int(float(distance) >= self.bin_threshold)
 
     def _resolve_date(self, name, year, source_tag):
+        if not self.require_collection_dates:
+            return None, None
+
         key = normalize_strain_name(name)
         if key in self.metadata_dates:
             return self.metadata_dates[key], "metadata"
@@ -120,7 +124,7 @@ class H3N2DataProcessor:
                 getattr(row, "year"),
                 source_tag,
             )
-            if collection_date is None:
+            if self.require_collection_dates and collection_date is None:
                 continue
             ha_records[int(getattr(row, "index"))] = {
                 "name": getattr(row, "name"),

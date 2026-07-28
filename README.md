@@ -57,7 +57,7 @@ python main.py --mode cv \
 ```
 #### Step 5: Run retrospective time-split evaluation
 
-Retrospective evaluation requires exact virus collection dates and independently pretrained models for each evaluation window.
+Retrospective evaluation requires exact virus collection dates and independently pretrained models for each evaluation window. For the command below, the model directory `pretrained_models/2020_NH` must exist; use `--pretrained-model-root` if your window-specific models are stored elsewhere.
 
 The metadata CSV must contain the following columns:
 
