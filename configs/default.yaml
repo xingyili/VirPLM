@@ -40,7 +40,7 @@ backtest:
   pretrained_model_root: pretrained_models
   ha_path: data_preprocess/tmp/H3N2_NHT_HA.csv
   hi_path: data_preprocess/tmp/H3N2_NHT_HI.csv
-  metadata_path: null
+  metadata_path: data_preprocess/data/H3N2/metadata.csv
 
   extra_ha_path: null
   extra_hi_path: null

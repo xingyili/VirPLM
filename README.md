@@ -67,11 +67,12 @@ Collection_Date
 ```
 
 ```bash
-python main.py \
-  --mode backtest \
-  --config configs/default.yaml \
+python main.py --mode backtest --config configs/default.yaml \
   --ha-path data_preprocess/tmp/H3N2_NHT_HA.csv \
-  --hi-path data_preprocess/tmp/H3N2_NHT_HI.csv 
+  --hi-path data_preprocess/tmp/H3N2_NHT_HI.csv \
+  --metadata-path data_preprocess/data/H3N2/metadata.csv \
+  --years 2020 \
+  --hemispheres NH
 ```
 
 You can customize the execution by modifying `configs/default.yaml` or command-line arguments.
