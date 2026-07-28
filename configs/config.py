@@ -26,9 +26,12 @@ class CrossValidationConfig:
 
 @dataclass
 class BacktestConfig:
-    pretrained_model_dir: str
+    # Root containing independently pretrained models:
+    # pretrained_model_root/2012_NH, ..., pretrained_model_root/2024_SH
+    pretrained_model_root: str
     ha_path: str
     hi_path: str
+    metadata_path: str
     extra_ha_path: Optional[str] = None
     extra_hi_path: Optional[str] = None
     num_epochs: int = 50
@@ -40,9 +43,9 @@ class BacktestConfig:
     num_workers: int = 4
     checkpoint_dir: str = "checkpoints_backtest"
     result_csv: str = "backtest_results.csv"
-    train_year_num: int = 7
-    test_year_num: int = 1
     val_ratio: float = 0.2
-    min_test_start_year: Optional[int] = 2012
-    descending: bool = True
+    years: Sequence[int] = field(default_factory=lambda: tuple(range(2012, 2025)))
+    hemispheres: Sequence[str] = ("NH", "SH")
+    descending: bool = False
     deduplicate: bool = False
+

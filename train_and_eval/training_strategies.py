@@ -1,9 +1,24 @@
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from datetime import date
+from typing import Iterator, List, Optional, Sequence, Tuple
+
 import numpy as np
 from sklearn.model_selection import KFold, train_test_split
 
 
+@dataclass(frozen=True)
+class BacktestWindow:
+ 
+
+    window_label: str
+    year: int
+    hemisphere: str
+    cutoff: date
+    test_end_exclusive: date
+
+
 def make_cross_validation_splits(dataset_size, n_splits=5, cv_rounds=1):
+ 
     idx = np.arange(dataset_size)
     for cv in range(cv_rounds):
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=cv)
@@ -11,53 +26,91 @@ def make_cross_validation_splits(dataset_size, n_splits=5, cv_rounds=1):
             train_val_idx = np.asarray(train_val_idx)
             test_idx = np.asarray(test_idx)
             train_idx, val_idx = train_test_split(
-                train_val_idx, test_size=0.25, random_state=cv, shuffle=True
+                train_val_idx,
+                test_size=0.25,
+                random_state=cv,
+                shuffle=True,
             )
             yield cv, fold, train_idx, val_idx, test_idx
 
 
+def build_retrospective_windows(
+    years: Sequence[int] = tuple(range(2012, 2025)),
+    hemispheres: Sequence[str] = ("NH", "SH"),
+) -> List[BacktestWindow]:
+  
+    windows: List[BacktestWindow] = []
+    for year in years:
+        for hemisphere in hemispheres:
+            if hemisphere == "NH":
+                cutoff = date(year - 1, 9, 1)
+                test_end = date(year, 2, 1)
+            elif hemisphere == "SH":
+                cutoff = date(year, 2, 1)
+                test_end = date(year, 9, 1)
+            else:
+                raise ValueError(f"Unsupported hemisphere: {hemisphere!r}")
+
+            windows.append(
+                BacktestWindow(
+                    window_label=f"{year}_{hemisphere}",
+                    year=int(year),
+                    hemisphere=hemisphere,
+                    cutoff=cutoff,
+                    test_end_exclusive=test_end,
+                )
+            )
+    return windows
+
+
+def _validate_dataset_dates(dataset) -> None:
+    required = ("at_dates", "sr_dates")
+    missing = [name for name in required if not hasattr(dataset, name)]
+    if missing:
+        raise AttributeError(
+            "The retrospective split requires exact collection dates. "
+            f"Dataset is missing attributes: {missing}. "
+            "Use the updated H3N2DataProcessor/FLUDataset."
+        )
+    if len(dataset.at_dates) != len(dataset) or len(dataset.sr_dates) != len(dataset):
+        raise ValueError("Dataset date arrays do not match dataset length.")
+
+
 def split_fludataset_for_backtest(
     dataset,
-    train_year_num: int = 14,
-    test_year_num: int = 2,
+    years: Sequence[int] = tuple(range(2012, 2025)),
+    hemispheres: Sequence[str] = ("NH", "SH"),
     val_ratio: float = 0.2,
-    random_state: int = 42,
-    min_test_start_year: Optional[int] = None,
-    descending: bool = True,
-) -> Tuple[List[List[int]], List[List[int]], List[List[int]], List[int]]:
-    at_year = dataset.at_years
-    sr_year = dataset.sr_years
-    valid_years = [y for y in at_year if 1900 < y < 2100]
-    if not valid_years:
-        raise ValueError("未找到有效年份，请检查HA文件的 year 列。")
+    random_state: int = 3407,
+    descending: bool = False,
+) -> Iterator[Tuple[BacktestWindow, List[int], List[int], List[int]]]:
+     
+    _validate_dataset_dates(dataset)
+    windows = build_retrospective_windows(years=years, hemispheres=hemispheres)
+    if descending:
+        windows = list(reversed(windows))
 
-    all_years = sorted(list(set(valid_years)))
-    print("时间轴 (Years):", all_years)
-    total_cv = len(all_years) - train_year_num - test_year_num + 1
-    if total_cv <= 0:
-        raise ValueError("可滑动的窗口数为 0，请调整 train_year_num / test_year_num。")
-
-    tmp_train_idx_list, tmp_val_idx_list, tmp_test_idx_list, tmp_test_year_list = [], [], [], []
-    tmp_train_years_list, tmp_test_years_list = [], []
-
-    for cv in range(total_cv):
-        train_years = all_years[0:cv + train_year_num]
-        test_years = all_years[cv + train_year_num: cv + train_year_num + test_year_num]
-        if not test_years:
-            continue
-        test_start_year = int(test_years[0])
-
+    for window in windows:
         train_all_idx = [
-            i for i, y in enumerate(at_year)
-            if (y in train_years) and (sr_year[i] < test_start_year)
+            i
+            for i, (at_date, sr_date) in enumerate(zip(dataset.at_dates, dataset.sr_dates))
+            if at_date < window.cutoff and sr_date < window.cutoff
         ]
         test_idx = [
-            i for i, y in enumerate(at_year)
-            if (y in test_years) and (sr_year[i] < test_start_year)
+            i
+            for i, (at_date, sr_date) in enumerate(zip(dataset.at_dates, dataset.sr_dates))
+            if window.cutoff <= at_date < window.test_end_exclusive
+            and sr_date < window.cutoff
         ]
 
         if len(train_all_idx) < 2:
-            print(f"[原始 CV {cv + 1}] 训练样本太少，跳过该窗口（test_start_year={test_start_year}）。")
+            print(
+                f"[Skip {window.window_label}] Too few historical pairs: "
+                f"{len(train_all_idx)}"
+            )
+            continue
+        if not test_idx:
+            print(f"[Skip {window.window_label}] No eligible test pairs.")
             continue
 
         train_idx, val_idx = train_test_split(
@@ -66,54 +119,19 @@ def split_fludataset_for_backtest(
             random_state=random_state,
             shuffle=True,
         )
-        tmp_train_idx_list.append(train_idx)
-        tmp_val_idx_list.append(val_idx)
-        tmp_test_idx_list.append(test_idx)
-        tmp_test_year_list.append(test_start_year)
-        tmp_train_years_list.append(train_years)
-        tmp_test_years_list.append(test_years)
 
-    if not tmp_test_year_list:
-        raise ValueError("没有生成任何有效的时间窗口，请检查年份和参数设置。")
+        # Defensive leakage checks.
+        for idx in list(train_idx) + list(val_idx):
+            assert dataset.at_dates[idx] < window.cutoff
+            assert dataset.sr_dates[idx] < window.cutoff
+        for idx in test_idx:
+            assert window.cutoff <= dataset.at_dates[idx] < window.test_end_exclusive
+            assert dataset.sr_dates[idx] < window.cutoff
 
-    if min_test_start_year is not None:
-        filtered = [
-            (tr, va, te, ty, tr_y, te_y)
-            for tr, va, te, ty, tr_y, te_y in zip(
-                tmp_train_idx_list,
-                tmp_val_idx_list,
-                tmp_test_idx_list,
-                tmp_test_year_list,
-                tmp_train_years_list,
-                tmp_test_years_list,
-            )
-            if ty >= min_test_start_year
-        ]
-        if not filtered:
-            raise ValueError(f"没有满足 test_start_year >= {min_test_start_year} 的窗口。")
-        tmp_train_idx_list, tmp_val_idx_list, tmp_test_idx_list, tmp_test_year_list, tmp_train_years_list, tmp_test_years_list = map(list, zip(*filtered))
-
-    order = sorted(range(len(tmp_test_year_list)), key=lambda i: tmp_test_year_list[i])
-    if descending:
-        order = order[::-1]
-
-    train_idx_list = [tmp_train_idx_list[i] for i in order]
-    val_idx_list = [tmp_val_idx_list[i] for i in order]
-    test_idx_list = [tmp_test_idx_list[i] for i in order]
-    test_year_list = [tmp_test_year_list[i] for i in order]
-    train_years_list = [tmp_train_years_list[i] for i in order]
-    test_years_list = [tmp_test_years_list[i] for i in order]
-
-    print("=== 回顾性时间窗口（按实际训练顺序）===")
-    for k, (tr_y, te_y, ty, tr_idx, va_idx, te_idx) in enumerate(
-        zip(train_years_list, test_years_list, test_year_list, train_idx_list, val_idx_list, test_idx_list),
-        start=1,
-    ):
         print(
-            f"[Split {k}] 训练年份范围={tr_y[0]}–{tr_y[-1]}，"
-            f"测试年份范围={te_y[0]}–{te_y[-1]}，"
-            f"测试起始年={ty}，样本: train={len(tr_idx)}, "
-            f"val={len(va_idx)}, test={len(te_idx)}"
+            f"[{window.window_label}] cutoff={window.cutoff.isoformat()}, "
+            f"test=[{window.cutoff.isoformat()}, "
+            f"{window.test_end_exclusive.isoformat()}), "
+            f"train={len(train_idx)}, val={len(val_idx)}, test={len(test_idx)}"
         )
-
-    return train_idx_list, val_idx_list, test_idx_list, test_year_list
+        yield window, list(train_idx), list(val_idx), list(test_idx)

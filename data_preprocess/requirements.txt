@@ -1,0 +1,7 @@
+pandas==2.2.3
+numpy==2.3.5
+openpyxl==3.1.5
+joblib==1.5.3
+tqdm==4.67.3
+loguru==0.7.3
+Unidecode==1.4.0

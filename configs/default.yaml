@@ -6,7 +6,7 @@ seq_len: 328
 pretrain:
   base_model_name: facebook/esm2_t30_150M_UR50D
   fasta_paths:
-    - data/Seq/H3N2.fasta
+    - data_preprocess/tmp/H3N2.fasta
   output_dir: H3pre_model
   batch_size: 16
   epochs: 10
@@ -18,8 +18,8 @@ pretrain:
 
 cross_validation:
   pretrained_model_dir: H3pre_model
-  ha_path: data/NAD/H3N2_demo_HA.csv
-  hi_path: data/NAD/H3N2_demo_HI.csv
+  ha_path: data_preprocess/tmp/H3N2_NHT_HA.csv
+  hi_path: data_preprocess/tmp/H3N2_NHT_HI.csv
   extra_ha_path: null
   extra_hi_path: null
   num_epochs: 50
@@ -37,11 +37,14 @@ cross_validation:
   deduplicate: true
 
 backtest:
-  pretrained_model_dir: H3pre_model
-  ha_path: data/NAD/H3N2_demo_HA.csv
-  hi_path: data/NAD/H3N2_demo_HI.csv
+  pretrained_model_root: pretrained_models
+  ha_path: data_preprocess/tmp/H3N2_NHT_HA.csv
+  hi_path: data_preprocess/tmp/H3N2_NHT_HI.csv
+  metadata_path: null
+
   extra_ha_path: null
   extra_hi_path: null
+
   num_epochs: 50
   classification_threshold: 2.0
   batch_train: 8
@@ -49,11 +52,12 @@ backtest:
   lr: 5.0e-5
   patience: 10
   num_workers: 4
+
   checkpoint_dir: checkpoints_backtest
   result_csv: backtest_results.csv
-  train_year_num: 7
-  test_year_num: 1
+
   val_ratio: 0.2
-  min_test_start_year: 2012
-  descending: true
+  years: [2018, 2019, 2020]
+  hemispheres: [NH, SH]
+  descending: false
   deduplicate: false
